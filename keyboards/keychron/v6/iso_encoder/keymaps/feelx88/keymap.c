@@ -68,13 +68,114 @@ const uint16_t PROGMEM encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS] = {
 
 // clang-format on
 
-bool process_record_user(uint16_t keycode, keyrecord_t *record) {
-    if (!process_record_keychron(keycode, record)) {
-        return false;
-    }
-    return true;
-}
-
 void housekeeping_task_user(void) {
     housekeeping_task_keychron();
 }
+
+bool locked = false;
+
+#define EXTENDED_LOCK
+#ifndef EXTENDED_LOCK
+static host_driver_t *host_driver = 0;
+
+enum custom_keycodes {
+  KEYLOCK = QK_USER_31,
+};
+
+bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+  switch (keycode) {
+    case KEYLOCK: {
+        static unsigned short lock_click_count = 0;
+
+        if (record->event.pressed) {
+            if (host_get_driver()) {
+                host_driver = host_get_driver();
+                clear_keyboard();
+                host_set_driver(0);
+                locked = true;
+                rgblight_disable();
+            } else {
+                if (lock_click_count < 3) {
+                    ++lock_click_count;
+                    break;
+                }
+                lock_click_count = 0;
+                host_set_driver(host_driver);
+                locked = false;
+                rgblight_enable();
+            }
+        }*
+        break;
+    }
+
+  }
+  return true;
+};
+
+#else // EXTENDED_LOCK
+
+struct password_entry {
+    uint16_t keycode;
+    bool entered;
+};
+uint8_t password_length = 4;
+struct password_entry password[] = {
+    {KC_KP_1, false},
+    {KC_KP_2, false},
+    {KC_KP_0, false},
+    {KC_KP_9, false},
+};
+
+static host_driver_t *host_driver = 0;
+
+enum custom_keycodes {
+  KEYLOCK = QK_USER_31,
+};
+
+bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+  if (locked) {
+    if (record->event.pressed) {
+      for (uint8_t x = 0; x < password_length; ++x) {
+        if (password[x].entered == false) {
+          if (keycode == password[x].keycode) {
+            password[x].entered = true;
+
+            if (x == password_length - 1) {
+              for (int x = 0; x <= password_length; ++x) {
+                password[x].entered = false;
+              }
+              locked = false;
+              host_set_driver(host_driver);
+              rgblight_enable();
+            }
+          } else {
+            for (int x = 0; x <= password_length; ++x) {
+              password[x].entered = false;
+            }
+          }
+
+          break;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  switch (keycode) {
+    case KEYLOCK: {
+        if (record->event.pressed) {
+          host_driver = host_get_driver();
+          clear_keyboard();
+          host_set_driver(0);
+          rgblight_disable();
+          locked = true;
+        }
+        break;
+    }
+
+  }
+  return true;
+};
+
+#endif // EXTENDED_LOCK
