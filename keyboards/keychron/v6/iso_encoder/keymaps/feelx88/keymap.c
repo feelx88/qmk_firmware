@@ -73,14 +73,28 @@ void housekeeping_task_user(void) {
 }
 
 bool locked = false;
+host_driver_t *host_driver = 0;
+
+enum feelx88_custom_keycodes {
+  KEYLOCK = QK_USER_31,
+};
+
+void lock(void) {
+  host_driver = host_get_driver();
+  clear_keyboard();
+  host_set_driver(0);
+  locked = true;
+  rgblight_disable();
+};
+
+void unlock(void) {
+  host_set_driver(host_driver);
+  locked = false;
+  rgblight_enable();
+};
 
 #define EXTENDED_LOCK
 #ifndef EXTENDED_LOCK
-static host_driver_t *host_driver = 0;
-
-enum custom_keycodes {
-  KEYLOCK = QK_USER_31,
-};
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
   switch (keycode) {
@@ -89,20 +103,14 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
         if (record->event.pressed) {
             if (host_get_driver()) {
-                host_driver = host_get_driver();
-                clear_keyboard();
-                host_set_driver(0);
-                locked = true;
-                rgblight_disable();
+                lock();
             } else {
                 if (lock_click_count < 3) {
                     ++lock_click_count;
                     break;
                 }
                 lock_click_count = 0;
-                host_set_driver(host_driver);
-                locked = false;
-                rgblight_enable();
+                unlock();
             }
         }*
         break;
@@ -126,32 +134,26 @@ struct password_entry password[] = {
     {KC_KP_9, false},
 };
 
-static host_driver_t *host_driver = 0;
-
-enum custom_keycodes {
-  KEYLOCK = QK_USER_31,
+void reset_password(void) {
+  for (int x = 0; x < password_length; ++x) {
+    password[x].entered = false;
+  }
 };
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
   if (locked) {
     if (record->event.pressed) {
-      for (uint8_t x = 0; x < password_length; ++x) {
-        if (password[x].entered == false) {
-          if (keycode == password[x].keycode) {
-            password[x].entered = true;
+      for (uint8_t character_index = 0; character_index < password_length; ++character_index) {
+        if (password[character_index].entered == false) {
+          if (keycode == password[character_index].keycode) {
+            password[character_index].entered = true;
 
-            if (x == password_length - 1) {
-              for (int x = 0; x <= password_length; ++x) {
-                password[x].entered = false;
-              }
-              locked = false;
-              host_set_driver(host_driver);
-              rgblight_enable();
+            if (character_index == password_length - 1) {
+              reset_password();
+              unlock();
             }
           } else {
-            for (int x = 0; x <= password_length; ++x) {
-              password[x].entered = false;
-            }
+            reset_password();
           }
 
           break;
@@ -165,15 +167,10 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
   switch (keycode) {
     case KEYLOCK: {
         if (record->event.pressed) {
-          host_driver = host_get_driver();
-          clear_keyboard();
-          host_set_driver(0);
-          rgblight_disable();
-          locked = true;
+          lock();
         }
         break;
     }
-
   }
   return true;
 };
