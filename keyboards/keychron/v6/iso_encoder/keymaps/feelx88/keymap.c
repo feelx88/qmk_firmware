@@ -72,80 +72,74 @@ void housekeeping_task_user(void) {
     housekeeping_task_keychron();
 }
 
-bool locked = false;
+bool           locked      = false;
 host_driver_t *host_driver = 0;
-int rgb_mode;
-HSV rgb_hsv;
-int rgb_speed;
-uint8_t numpad_count = 10;
-int numpad_indices[] = {
-  57,  58, 59,
-  76,  74,  75,
-  92,  93, 94,
-  106
-};
+int            rgb_mode;
+HSV            rgb_hsv;
+int            rgb_speed;
+uint8_t        numpad_count     = 10;
+int            numpad_indices[] = {57, 58, 59, 76, 74, 75, 92, 93, 94, 106};
 
 enum feelx88_custom_keycodes {
-  KEYLOCK = QK_USER_31,
+    KEYLOCK = QK_USER_31,
 };
 
 void lock(void) {
-  host_driver = host_get_driver();
-  clear_keyboard();
-  host_set_driver(0);
-  locked = true;
+    host_driver = host_get_driver();
+    clear_keyboard();
+    host_set_driver(0);
+    locked = true;
 
-  rgb_speed = rgb_matrix_get_speed();
-  rgb_mode = rgb_matrix_get_mode();
-  rgb_hsv = rgb_matrix_get_hsv();
-  rgb_matrix_set_speed_noeeprom(0);
-  rgb_matrix_mode_noeeprom(RGB_MATRIX_SOLID_COLOR);
-  rgb_matrix_sethsv_noeeprom(HSV_OFF);
+    rgb_speed = rgb_matrix_get_speed();
+    rgb_mode  = rgb_matrix_get_mode();
+    rgb_hsv   = rgb_matrix_get_hsv();
+    rgb_matrix_set_speed_noeeprom(0);
+    rgb_matrix_mode_noeeprom(RGB_MATRIX_SOLID_COLOR);
+    rgb_matrix_sethsv_noeeprom(HSV_OFF);
 };
 
 void unlock(void) {
-  host_set_driver(host_driver);
-  locked = false;
-  rgb_matrix_mode_noeeprom(rgb_mode);
-  rgb_matrix_sethsv_noeeprom(rgb_hsv.h, rgb_hsv.s, rgb_hsv.v);
-  rgb_matrix_set_speed_noeeprom(rgb_speed);
+    host_set_driver(host_driver);
+    locked = false;
+    rgb_matrix_mode_noeeprom(rgb_mode);
+    rgb_matrix_sethsv_noeeprom(rgb_hsv.h, rgb_hsv.s, rgb_hsv.v);
+    rgb_matrix_set_speed_noeeprom(rgb_speed);
 };
 
 #define EXTENDED_LOCK
 #ifndef EXTENDED_LOCK
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
-  switch (keycode) {
-    case KEYLOCK: {
-        static unsigned short lock_click_count = 0;
+    switch (keycode) {
+        case KEYLOCK: {
+            static unsigned short lock_click_count = 0;
 
-        if (record->event.pressed) {
-            if (host_get_driver()) {
-                lock();
-            } else {
-                if (lock_click_count < 3) {
-                    ++lock_click_count;
-                    break;
+            if (record->event.pressed) {
+                if (host_get_driver()) {
+                    lock();
+                } else {
+                    if (lock_click_count < 3) {
+                        ++lock_click_count;
+                        break;
+                    }
+                    lock_click_count = 0;
+                    unlock();
                 }
-                lock_click_count = 0;
-                unlock();
             }
-        }*
-        break;
+            break;
+        }
     }
-
-  }
-  return true;
+    return true;
 };
 
 #else // EXTENDED_LOCK
 
 struct password_entry {
     uint16_t keycode;
-    bool entered;
+    bool     entered;
 };
-uint8_t password_length = 4;
-struct password_entry password[] = {
+uint8_t               password_length = 4;
+struct password_entry password[]      = {
     {KC_KP_1, false},
     {KC_KP_2, false},
     {KC_KP_0, false},
@@ -153,59 +147,64 @@ struct password_entry password[] = {
 };
 
 void reset_password(void) {
-  for (int x = 0; x < password_length; ++x) {
-    password[x].entered = false;
-  }
+    for (int x = 0; x < password_length; ++x) {
+        password[x].entered = false;
+    }
 };
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
-  if (locked) {
-    if (record->event.pressed) {
-      for (uint8_t character_index = 0; character_index < password_length; ++character_index) {
-        if (password[character_index].entered == false) {
-          if (keycode == password[character_index].keycode) {
-            password[character_index].entered = true;
-
-            if (character_index == password_length - 1) {
-              reset_password();
-              unlock();
-            }
-          } else {
-            reset_password();
-          }
-
-          break;
-        }
-      }
-    }
-
-    return false;
-  }
-
-  switch (keycode) {
-    case KEYLOCK: {
+    if (locked) {
         if (record->event.pressed) {
-          lock();
+            for (uint8_t character_index = 0; character_index < password_length; ++character_index) {
+                if (password[character_index].entered == false) {
+                    if (keycode == password[character_index].keycode) {
+                        password[character_index].entered = true;
+
+                        if (character_index == password_length - 1) {
+                            reset_password();
+                            unlock();
+                        }
+                    } else {
+                        reset_password();
+                    }
+
+                    break;
+                }
+            }
         }
-        break;
+
+        return false;
     }
-  }
-  return true;
+
+    switch (keycode) {
+        case KEYLOCK: {
+            if (record->event.pressed) {
+                lock();
+            }
+            break;
+        }
+    }
+    return true;
 };
 
 bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
-  if (locked) {
-    for (uint8_t x = 0; x < numpad_count; ++x) {
-      rgb_matrix_set_color(numpad_indices[x], 255, 0, 0);
+    if (locked) {
+        for (uint8_t x = 0; x < numpad_count; ++x) {
+            rgb_matrix_set_color(numpad_indices[x], 255, 0, 0);
+        }
+        return false;
     }
-    return false;
-  }
 
-  if (host_keyboard_led_state().num_lock) {
-    rgb_matrix_set_color(37, 255, 255, 255);
-  }
+    if (host_keyboard_led_state().num_lock) {
+        rgb_matrix_set_color(37, 255, 255, 255);
+    }
 
-  return true;
+    if (get_highest_layer(layer_state | default_layer_state) == 0) {
+        rgb_matrix_set_color(96, 255, 255, 255);
+        rgb_matrix_set_color(100, 255, 255, 255);
+    }
+
+    return true;
 }
 
 #endif // EXTENDED_LOCK
