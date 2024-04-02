@@ -200,8 +200,7 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     }
 
     if (get_highest_layer(layer_state | default_layer_state) == 0) {
-        rgb_matrix_set_color(96, 255, 255, 255);
-        rgb_matrix_set_color(100, 255, 255, 255);
+        rgb_matrix_set_color(0, 255, 255, 255);
     }
 
     return true;
